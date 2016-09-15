@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+
+import sys, getopt, os, time, random
+import subprocess as term
+from collections import OrderedDict
+
+help_string = '''
+This script forces a command to only run on a particular number of processors. Empty processors are prioritized over
+used ones/hyperthreading, and in the event of core oversubscription, returns a warning and defaults to a cpu not already
+used by the executing user. This is basically just a smart wrapper for the "taskset" Linux utility.
+
+Jeff Stafford - HPCVL
+
+
+Usage: sandbox [options] -c <command>
+
+Mandatory arguments:
+-c <command>    Run <command>
+
+Available options:
+-h, --help      Print this help screen
+-n <procs>      Cap command at <procs> number of processors. Default is 1 processor.
+-d              Add a random time delay before running a job (use this if you expect to run multiple sandbox processes
+                on the same machine that will begin running more or less all at the exact same time).
+
+'''
+
+
+def main(argv):
+    # parse arguments
+    needprocs = 1
+    delay = False
+    opts, args = getopt.getopt(argv[1:], 'hdn:c', longopts=['--help'])
+    for option, val in opts:
+            if option in ['h', '--help']:
+                print(help_string)
+                sys.exit()
+            elif option == '-d':
+                delay = True
+            elif option == '-n':
+                needprocs = int(val)
+            elif option == '-c':
+                pass
+    try:
+        command = list_to_string(argv[argv.index('-c') + 1:], ' ')
+    except ValueError:
+        print(help_string)
+        sys.exit('Error: you must specify a valid command with -c <command>.')
+
+    if delay:
+        # prevents the same core from given to multiple sandbox processes repeatedly
+        time.sleep(random.random() * 30)
+
+    free = get_avail_procs('hpc')
+    userstream = term.Popen('whoami', shell=True, stdout=term.PIPE, stderr=term.PIPE)
+    user = userstream.stdout.read().decode('utf-8').rstrip()
+    if 'hpc' not in user:  # catch users with nonstandard names
+        free = get_avail_by_percent(10)
+
+    # check for not enough processers available, use stuff not already used by user
+    if len(free) < needprocs:
+        # add to existing free list and deduplicate (to maintain priority of any 'actually free' processors)
+        free += get_avail_procs(user)
+        free = list(OrderedDict.fromkeys(free))
+        print('Warning: Node appears to be oversubscribed, defaulting to CPUs not already in use by ' + user + '.')
+        if len(free) == 0:
+            print('Warning: No free cores detected, defaulting to first CPUs detected.')
+            free = get_proc_list()
+    will_use = list_to_string(free[:needprocs], ',')
+
+    # execute user process on lowest numbered cores available
+    print('Executing command \"' + command + '\" on CPU#s ' + will_use)
+    os.system('taskset -c ' + will_use + ' ' + command)
+
+
+def list_to_string(list_in, delim):
+    string = str(list_in[0])
+    if len(list_in) > 0:
+        for element in list_in[1:]:
+            string += delim + element
+    return string
+
+
+def get_avail_by_percent(percent):
+    """
+    Find procs not being used more than "percent" by any processes on a node
+
+    :param percent
+    :return:
+    """
+    percent_stream = term.Popen("ps -eo pid,psr,pcpu,user,command | tail -n +2 | sort -nr -k 3,3 | awk '$3 > " +
+                                str(percent) + " '{print $2}'",
+                                shell=True, stdout=term.PIPE, stderr=term.PIPE)
+    used = percent_stream.stdout.read().decode('utf-8').split('\n')
+    allprocs = get_proc_list()
+    return [proc for proc in allprocs if proc not in used]
+
+
+def get_avail_procs(prefix):
+    """
+    Get all processors not used by "prefix" users on a node.
+
+    :param prefix: A string to grep with
+    :return: Returns a list of strings of unused processors
+    """
+
+    uprocs = term.Popen("ps -eLF | grep " + prefix + " | awk '{print $9}' | sort | uniq",
+                        shell=True, stdout=term.PIPE, stderr=term.PIPE)
+    used = uprocs.stdout.read().decode('utf-8').split('\n')
+    allprocs = get_proc_list()
+    return [proc for proc in allprocs if proc not in used]
+
+
+def get_proc_list():
+    """
+    Get a list of strings containing all processors on a machine.
+    :return:
+    """
+    nprocs = term.Popen('nproc', shell=True, stdout=term.PIPE, stderr=term.PIPE)
+    total = int(nprocs.stdout.read().decode('utf-8'))
+    return [str(i) for i in range(0, total)]
+
+
+main(sys.argv)
