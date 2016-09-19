@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+
+# A helper script to convert old SGE scripts to their new fancy SLURM equivalents. Specific to the CAC cluster, but
+# should be fairly easy to modify if so inclined.
+
+# Jeff Stafford - CAC
+
+import sys
+import re
+import argparse
+import os
+
+SGE_FLAG = '#$ '
+SLURM_FLAG = '#SBATCH '
+# add slurm to SGE mappings here:
+
+
+# parse args
+def main(args):
+    parser = argparse.ArgumentParser(
+        description='Converts old Sun Grid Engine (SGE) job scripts to their fancy schmancy SLURM equivalents')
+    parser.add_argument('input_sge', nargs=1, help='path/name of SGE job script to convert')
+    parser.add_argument('output_slurm', nargs=1, help='Output SLURM job script')
+    argv = parser.parse_args()
+
+    if argv.input_sge is None or not os.path.exists(argv.input_sge):
+        sys.exit("ERROR: You must specify a path to a valid SGE job script.")
+    if argv.output_slurm is None:
+        argv.output_slurm = re.sub("\.sh", "-slurm.sh", argv.input_sge)
+        print("No output file name specified, using", argv.output_slurm)
+
+    convert(argv.input_sge, argv.output_slurm)
+
+
+# do the sge -> slurm conversion
+def convert(input, output):
+    print(input, output)
+
+
+if __name__ == '__main__':
+    main(sys.argv)
