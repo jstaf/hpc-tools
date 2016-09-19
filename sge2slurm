@@ -10,9 +10,18 @@ import re
 import argparse
 import os
 
-SGE_FLAG = '#$ '
+SGE_RE = re.compile('^#\$ ')
 SLURM_FLAG = '#SBATCH '
-# add slurm to SGE mappings here:
+# add slurm to SGE mappings here: (note: this is a protoytpe)
+# note: if not in this dictionary, the SGE flag simply gets removed
+MAPPINGS = {
+    '-l mf=(\d+)[gG]': '--mem=',    # mem request
+    '-pe \w (\d+)': '-c ',          # CPU request
+    '-o (\w+)': '-o \w+',
+    '-e (\w+)': '-e \w+',
+    '-M (\w+)': '--mail-address=',
+    '-m ([beas]+)': '--mail-type=[BEGIN,END,FAIL,ALL]'
+}
 
 
 # parse args
@@ -20,21 +29,47 @@ def main(args):
     parser = argparse.ArgumentParser(
         description='Converts old Sun Grid Engine (SGE) job scripts to their fancy schmancy SLURM equivalents')
     parser.add_argument('input_sge', nargs=1, help='path/name of SGE job script to convert')
-    parser.add_argument('output_slurm', nargs=1, help='Output SLURM job script')
+    parser.add_argument('output_slurm', nargs='?', help='Output SLURM job script')
     argv = parser.parse_args()
 
-    if argv.input_sge is None or not os.path.exists(argv.input_sge):
+    if not os.path.exists(argv.input_sge[0]):
         sys.exit("ERROR: You must specify a path to a valid SGE job script.")
     if argv.output_slurm is None:
-        argv.output_slurm = re.sub("\.sh", "-slurm.sh", argv.input_sge)
-        print("No output file name specified, using", argv.output_slurm)
+        output_slurm = re.sub("\.sh", "-slurm.sh", argv.input_sge[0])
+        print("No output file name specified, using '" + output_slurm + "' for output.")
+    else:
+        output_slurm = argv.output_slurm[0]
 
-    convert(argv.input_sge, argv.output_slurm)
+    # okay, we now have valid inputs, parse away
+    convert(argv.input_sge[0], output_slurm)
 
 
 # do the sge -> slurm conversion
-def convert(input, output):
-    print(input, output)
+def convert(in_path, out_path):
+    fin = open(in_path, 'r')
+    fout = open(out_path, 'w')
+
+    for line in fin:
+        # only convert lines beginning with '#$'
+        if re.match(SGE_RE, line) is not None:
+            # strip '#$' and replace with '#SBATCH'
+            line = re.sub(SGE_RE, SLURM_FLAG, line)
+
+            line = parse(line)
+            if line != '':
+                fout.write(line)
+        else:
+            fout.write(line)
+
+    fin.close()
+    fout.close()
+
+
+def parse(string):
+    # TODO prototype
+    for key in MAPPINGS.keys():
+        pass
+    pass
 
 
 if __name__ == '__main__':
