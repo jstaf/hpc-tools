@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # A helper script to convert old SGE scripts to their new fancy SLURM equivalents. Specific to the CAC cluster, but
-# should be fairly easy to modify if so inclined.
+# should be fairly easy to modify if so inclined (see MAPPINGS dictionary).
 
 # Jeff Stafford - CAC
 
@@ -12,16 +12,40 @@ import os
 
 SGE_RE = re.compile('^#\$ ')
 SLURM_FLAG = '#SBATCH '
-# add slurm to SGE mappings here: (note: this is a protoytpe)
+
+# add slurm to SGE mappings here:
 # note: if not in this dictionary, the SGE flag simply gets removed
 MAPPINGS = {
-    '-l mf=(\d+)[gG]': '--mem=',    # mem request
-    '-pe \w (\d+)': '-c ',          # CPU request
-    '-o (\w+)': '-o \w+',
-    '-e (\w+)': '-e \w+',
-    '-M (\w+)': '--mail-address=',
-    '-m ([beas]+)': '--mail-type=[BEGIN,END,FAIL,ALL]'
+    '-l mf=(\d+)[gG]':
+        lambda val: '--mem=' + str(float(val) * 1000),
+    '-pe \w+ (\d+)':
+        lambda val: '-c ' + str(val),
+    '(-o \w+)':
+        lambda val: val,
+    '(-e \w+)':
+        lambda val: val,
+    '-M (\w+@\w+(\.\w+)*)':
+        lambda val: '--mail-address=' + str(val),
+    '-m ([beas]+)':
+        lambda val: '--mail-type=' + mail_flags(val)
 }
+
+
+# because python is a terrible language that seemingly can't handle simple things like multi-line lambdas
+def mail_flags(flags):
+    new_flags = []
+    if 'b' in flags:
+        new_flags.append('BEGIN')
+    if 'e' in flags:
+        new_flags.append('END')
+    if 'a' in flags or 's' in flags:
+        new_flags.append('FAIL')
+
+    flags_str = ','.join(new_flags)
+    if flags_str == 'BEGIN,END,FAIL':
+        flags_str = 'ALL'
+
+    return flags_str
 
 
 # parse args
@@ -53,11 +77,11 @@ def convert(in_path, out_path):
         # only convert lines beginning with '#$'
         if re.match(SGE_RE, line) is not None:
             # strip '#$' and replace with '#SBATCH'
-            line = re.sub(SGE_RE, SLURM_FLAG, line)
+            line = re.sub(SGE_RE, "", line)
 
             line = parse(line)
-            if line != '':
-                fout.write(line)
+            if line is not None:  # check to make sure match was returned
+                fout.write(SLURM_FLAG + line + '\n')
         else:
             fout.write(line)
 
@@ -66,10 +90,11 @@ def convert(in_path, out_path):
 
 
 def parse(string):
-    # TODO prototype
     for key in MAPPINGS.keys():
-        pass
-    pass
+        capture = re.search(key, string)
+        if capture is not None:
+            return MAPPINGS[key](capture.group(1))
+    return None
 
 
 if __name__ == '__main__':
