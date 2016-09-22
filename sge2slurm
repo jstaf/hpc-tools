@@ -13,21 +13,34 @@ import os
 SGE_RE = re.compile('^#\$ ')
 SLURM_FLAG = '#SBATCH '
 
-# add slurm to SGE mappings here:
-# note: if not in this dictionary, the SGE flag simply gets removed
+# Add slurm to SGE mappings here:
+# Note: if not in this dictionary, the SGE flag simply gets removed. Some flags have been intentionally left out
+# (like -cwd) because they are simply SLURM's default behavior.
 MAPPINGS = {
-    '-l mf=(\d+)[gG]':
-        lambda val: '--mem=' + str(float(val) * 1000),
-    '-pe \w+ (\d+)':
-        lambda val: '-c ' + str(val),
-    '(-o \w+)':
+    '-l\s+mf=(\d+)[gG]{1}':     # mem request
+        lambda val: '--mem=' + str(int(val) * 1000),
+    '-l\s+mem=(\d+)':           # alternate mem request
+        lambda val: '--mem=' + val,
+    '-pe\s+\S+\s+(\d+)':        # number of processors
+        lambda val: '-c ' + val,
+    '(-o\s+\S+)':               # stdout log
         lambda val: val,
-    '(-e \w+)':
+    '(-e\s+\S+)':               # stderr log
         lambda val: val,
-    '-M (\w+@\w+(\.\w+)*)':
-        lambda val: '--mail-address=' + str(val),
-    '-m ([beas]+)':
-        lambda val: '--mail-type=' + mail_flags(val)
+    '-M\s+(\w+@\w+(\S\w+)*)':   # mail address
+        lambda val: '--mail-address=' + val,
+    '-m\s+([beas]+)':           # mail type
+        lambda val: '--mail-type=' + mail_flags(val),
+    '-N\s+(\S+)':               # job name
+        lambda val: '-J ' + val,
+    '-l\s+hostname=(\S+)':      # hardcoded hostname
+        lambda val: '-w ' + val,
+    '-wd (\S+)':                # working directory change
+        lambda val: '-D ' + val,
+    '-t\s+(\d+-\d+:\d+)':       # array job
+        lambda val: '--array=' + val,
+    '(-A\s+\S+)':               # accounting id
+        lambda val: val
 }
 
 
@@ -60,18 +73,27 @@ def main(args):
         sys.exit("ERROR: You must specify a path to a valid SGE job script.")
     if argv.output_slurm is None:
         output_slurm = re.sub("\.sh", "-slurm.sh", argv.input_sge[0])
-        print("No output file name specified, using '" + output_slurm + "' for output.")
+        print("No output file name specified, using '" + output_slurm + "' for output.\n")
     else:
-        output_slurm = argv.output_slurm[0]
+        output_slurm = argv.output_slurm
 
     # okay, we now have valid inputs, parse away
     convert(argv.input_sge[0], output_slurm)
+    check(output_slurm)
+    print('\nJob will use the default queue unless changed with "#SBATCH -p partitionName".')
+    print('Run "sinfo" to see a list of available partitions.')
 
 
-# do the sge -> slurm conversion
 def convert(in_path, out_path):
+    """
+    Do the sge -> slurm conversion
+    :param in_path: sge filepath
+    :param out_path: slurm filepath
+    """
     fin = open(in_path, 'r')
     fout = open(out_path, 'w')
+    nslots = re.compile('\$NSLOTS')
+    sge_task_id = re.compile('\$SGE_TASK_ID')
 
     for line in fin:
         # only convert lines beginning with '#$'
@@ -82,13 +104,47 @@ def convert(in_path, out_path):
             if line is not None:  # check to make sure match was returned
                 fout.write(SLURM_FLAG + line + '\n')
         else:
+            # find and replace some key environment variables people use
+            line = re.sub(nslots, '$SLURM_JOB_CPUS_PER_NODE', line)
+            line = re.sub(sge_task_id, '$SLURM_ARRAY_TASK_ID', line)
             fout.write(line)
 
     fin.close()
     fout.close()
 
 
+def check(slurm):
+    """
+    Check to make sure people specified all mandatory resource flags, and if not, add them.
+    :param slurm:
+    """
+    cpus = False
+    mem = False
+    wall = False
+
+    with open(slurm, 'r') as fin:
+        for line in fin:
+            if '#SBATCH -c' in line:
+                cpus = True
+            if '#SBATCH --mem' in line:
+                mem = True
+            if '#SBATCH -t' in line:
+                wall = True
+
+    if not cpus:
+        print('WARNING: No CPUs requested, unless changed with "#SBATCH -c cpus", your job will be assigned 1 CPU by default.')
+    if not mem:
+        print('WARNING: No memory requested, unless changed with "#SBATCH --mem=megabytes", your job will be killed if it exceeds 6GB of RAM')
+    if not wall:
+        print('WARNING: No walltime requested, unless changed with "#SBATCH -t HH:MM:SS", your job will only run for 6 hours.')
+
+
 def parse(string):
+    """
+    Map SGE flags to SLURM flags
+    :param string: input line
+    :return: SLURMified output line
+    """
     for key in MAPPINGS.keys():
         capture = re.search(key, string)
         if capture is not None:
