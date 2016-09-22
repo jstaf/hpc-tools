@@ -76,9 +76,8 @@ def convert(in_path, out_path):
     for line in fin:
         # only convert lines beginning with '#$'
         if re.match(SGE_RE, line) is not None:
-            # strip '#$' and replace with '#SBATCH'
+            # strip '#$'
             line = re.sub(SGE_RE, "", line)
-
             line = parse(line)
             if line is not None:  # check to make sure match was returned
                 fout.write(SLURM_FLAG + line + '\n')
