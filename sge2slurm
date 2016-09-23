@@ -11,38 +11,38 @@ import argparse
 import os
 
 SGE_RE = re.compile('^#\$ ')
+JOB_ID_RE = re.compile('\$JOB_ID')
 SLURM_FLAG = '#SBATCH '
 
 # Add slurm to SGE mappings here:
 # Note: if not in this dictionary, the SGE flag simply gets removed. Some flags have been intentionally left out
 # (like -cwd) because they are simply SLURM's default behavior.
 MAPPINGS = {
-    '-l\s+mf=(\d+)[gG]{1}':     # mem request
+    '-l\s+mf=(\d+)[gG]{1}':         # mem request
         lambda val: '--mem=' + str(int(val) * 1000),
-    '-l\s+mem=(\d+)':           # alternate mem request
+    '-l\s+mem=(\d+)':               # alternate mem request
         lambda val: '--mem=' + val,
-    '-pe\s+\S+\s+(\d+)':        # number of processors
+    '-pe\s+\S+\s+(\d+)':            # number of processors
         lambda val: '-c ' + val,
-    '(-o\s+\S+)':               # stdout log
-        lambda val: val,
-    '(-e\s+\S+)':               # stderr log
-        lambda val: val,
-    '-M\s+(\w+@\w+(\S\w+)*)':   # mail address
+    '(-[oe]\s+\S+)':                # stdout/stderr log
+        lambda val: re.sub(JOB_ID_RE, '%j', val),
+    '-M\s+(\w+@\w+(\S\w+)*)':       # mail address
         lambda val: '--mail-address=' + val,
-    '-m\s+([beas]+)':           # mail type
+    '-m\s+([beas]+)':               # mail type
         lambda val: '--mail-type=' + mail_flags(val),
-    '-N\s+(\S+)':               # job name
+    '-N\s+(\S+)':                   # job name
         lambda val: '-J ' + val,
-    '-l\s+hostname=(\S+)':      # hardcoded hostname
+    '-l\s+hostname=(\S+)':          # hardcoded hostname
         lambda val: '-w ' + val,
-    '-wd (\S+)':                # working directory change
+    '-wd\s+(\S+)':                    # working directory change
         lambda val: '-D ' + val,
-    '-t\s+(\d+-\d+:\d+)':       # array job
+    '-t\s+(\d+-\d+:\d+)':           # array job
         lambda val: '--array=' + val,
-    '(-A\s+\S+)':               # accounting id
+    '(-A\s+\S+)':                   # accounting id
+        lambda val: val,
+    '-l\s+h[_ ]rt\s+(\d+:\d+:\d+)': # walltime
         lambda val: val
 }
-
 
 # because python is a terrible language that seemingly can't handle simple things like multi-line lambdas
 def mail_flags(flags):
