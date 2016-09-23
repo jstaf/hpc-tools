@@ -34,7 +34,7 @@ MAPPINGS = {
         lambda val: '-J ' + val,
     '-l\s+hostname=(\S+)':          # hardcoded hostname
         lambda val: '-w ' + val,
-    '-wd\s+(\S+)':                    # working directory change
+    '-wd\s+(\S+)':                  # working directory change
         lambda val: '-D ' + val,
     '-t\s+(\d+-\d+:\d+)':           # array job
         lambda val: '--array=' + val,
