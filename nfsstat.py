@@ -24,8 +24,9 @@ def main():
     # get stats for nfs traffic
     all_stats = []
     for node in nodes:
-        traffic = get_node_nfs(node)
-        all_stats.append(concat_nfs_entry(node, traffic))
+        traffic = concat_nfs_entry(node, get_node_nfs(node))
+        for mount in traffic:
+            all_stats.append(mount)
 
     # write to csv
     with open('nfs.csv', 'w') as out:
@@ -40,7 +41,7 @@ def get_node_nfs(node):
     """
     Get and parse a node's NFS traffic.
     """
-    ssh = subprocess.Popen(['ssh', node, '-o ConnectTimeout=3 "/usr/sbin/nfsiostat"'], 
+    ssh = subprocess.Popen(['ssh', node, '"/usr/sbin/nfsiostat"'], 
         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     nfsiostat = ssh.stdout.read().split('\n')
 
@@ -55,7 +56,7 @@ def get_node_nfs(node):
                 entries.append(entry)
             entry = {}
             entry['device'] = line.split(':')[0]
-            entry['user'] = re.findall('/(\w+):', line)[0]
+            entry['user'] = re.findall('/([\.\-_\w]+):', line)[0]
         elif 'read:' in line:
             nextline = 'read'
         elif 'write:' in line:
