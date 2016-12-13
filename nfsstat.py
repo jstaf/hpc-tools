@@ -41,8 +41,8 @@ def get_node_nfs(node):
     """
     Get and parse a node's NFS traffic.
     """
-    ssh = subprocess.Popen(['ssh', node, '"/usr/sbin/nfsiostat"'], 
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ssh = subprocess.Popen('ssh ' + node + ' -o ConnectTimeout=5 -o StrictHostKeyChecking=no "/usr/sbin/nfsiostat"',
+        shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     nfsiostat = ssh.stdout.read().split('\n')
 
     # list of dictionaries with nfs stats

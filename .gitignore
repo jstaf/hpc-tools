@@ -2,3 +2,5 @@
 testfiles/
 nodes.txt
 .vscode/
+*.csv
+
