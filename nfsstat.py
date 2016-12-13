@@ -28,7 +28,7 @@ def main():
         all_stats.append(concat_nfs_entry(node, traffic))
 
     # write to csv
-    with open('nfs.csv') as out:
+    with open('nfs.csv', 'w') as out:
         csvwrite = csv.writer(out)
         csvwrite.writerow(['node', 'device', 'user', 
             'rOps_s', 'rkB_s', 'rkB_op', 'rretrans', 'ravgRTT_ms', 'ravgexe_ms',
