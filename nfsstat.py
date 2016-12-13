@@ -32,8 +32,8 @@ def main():
     with open('nfs.csv', 'w') as out:
         csvwrite = csv.writer(out)
         csvwrite.writerow(['node', 'device', 'user', 
-            'rOps_s', 'rkB_s', 'rkB_op', 'rretrans', 'ravgRTT_ms', 'ravgexe_ms',
-            'wOps_s', 'wkB_s', 'wkB_op', 'wretrans', 'wavgRTT_ms', 'wavgexe_ms'])
+            'rOps_s', 'rkB_s', 'rkB_op', 'rretrans', 'rblank', 'ravgRTT_ms', 'ravgexe_ms',
+            'wOps_s', 'wkB_s', 'wkB_op', 'wretrans', 'wblank', 'wavgRTT_ms', 'wavgexe_ms'])
         csvwrite.writerows(all_stats)
 
 
