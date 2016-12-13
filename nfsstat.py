@@ -76,3 +76,5 @@ def concat_nfs_entry(node, entries):
         outlist.append([node, entry['device'], entry['user']] + entry['read'] + entry['write'])
     return outlist
 
+if __name__ == '__main__':
+    main()
