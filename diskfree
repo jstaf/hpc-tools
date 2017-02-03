@@ -48,7 +48,7 @@ def main():
 
     #######################################
     # get partition stats
-    partstats = get_partition_free(partitions)
+    partstats = get_partition_free(partitions, increment=increment)
 
     if argv.email is not None:
         # check to see if the partition(s) in question failed the check
@@ -68,7 +68,7 @@ def main():
             email['From'] = 'noreply@' + socket.getfqdn()
             email['To'] = argv.email[0]
 
-            server = smtplib.SMTP('localhost')
+            server = smtplib.SMTP(host='localhost', port=25)
             server.send_message(email)
             server.quit()
 
