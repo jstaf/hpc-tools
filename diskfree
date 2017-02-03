@@ -3,6 +3,9 @@
 import argparse
 import sys
 import re
+import smtplib
+import socket
+from email.mime.text import MIMEText
 import psutil
 import pandas as pd
 
@@ -12,7 +15,7 @@ def main():
     ###########################################
     # argument parsing
     parser = argparse.ArgumentParser(description='Get disk usage for a given partition (or all partitions). Can send emails if disk space goes below a given threshold.')
-    parser.add_argument('partition', nargs='?', 
+    parser.add_argument('partition', nargs='?',
                         help='Partition to check space on. All partitions will be checked if this option is not used.')
     parser.add_argument('-s', '--size', nargs=1, choices=sizes, 
                         help='Disk usage should be reported in this increment.')
@@ -40,21 +43,53 @@ def main():
     # make sure an email has been provided if diskfree has been setup to email at a threshold
     if (argv.percent_free is not None or argv.threshold_free is not None) and argv.email is None:
         sys.exit('Error: Email address must be set if using a threshold option.')
+    if (argv.percent_free is None and argv.threshold_free is None) and argv.email is not None:
+        sys.exit('Error: A threshold must be set to use emailing utility.')
 
     #######################################
     # get partition stats
+    partstats = get_partition_free(partitions)
+
+    if argv.email is not None:
+        # check to see if the partition(s) in question failed the check
+        failed = set()
+        if argv.percent_free is not None:
+            failed.update(partstats.index[partstats['percent'] < argv.percent_free].format())
+        if argv.threshold_free is not None:            
+            failed.update(partstats.index[partstats['free'].apply(dehumanize) < dehumanize(argv.threshold_free)].format())
+
+        if len(failed) > 0:
+            # send an email with full disk usages and highlight which partitions failed the check
+            hostname = socket.gethostname()
+            message = '\n'.join(['Partitions ' + ', '.join(failed) + ' on ' + hostname + ' has passed a disk usage threshold.', '',
+                                 'All disks:', str(get_partition_free(all_partitions))])
+            email = MIMEText(message)
+            email['Subject'] = 'Disk threshold passed on ' + hostname
+            email['From'] = 'noreply@' + socket.getfqdn()
+            email['To'] = argv.email[0]
+
+            server = smtplib.SMTP('localhost')
+            server.send_message(email)
+            server.quit()
+
+    else:
+        # just print output
+        print(partstats)
+
+
+def get_partition_free(partitions, increment=None):
+    '''
+    Returns a dataframe analogous to 'df -h' on UNIX.
+    '''
+    if not isinstance(partitions, list):
+        partitions = [partitions]
     partstats = []
     for partition in partitions:
         partstats.append(psutil.disk_usage(partition))
     partstats = pd.DataFrame(partstats, index=partitions)
     partstats['percent'] = 100. - partstats['percent']
     partstats[['total', 'used', 'free']] = partstats[['total', 'used', 'free']].applymap(lambda cell: humanize(cell, increment))
-
-    if argv.email is not None:
-        # send an email with full disk usages and highlight which partitions failed the check
-    else:
-        # just print output
-        print(partstats)
+    return partstats
 
 
 def humanize(num_bytes, size=None):
