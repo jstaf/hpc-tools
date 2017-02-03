@@ -9,17 +9,22 @@ import pandas as pd
 sizes = ['B', 'K', 'M', 'G', 'T', 'P', 'E']
 
 def main():
-    parser = argparse.ArgumentParser(description='Get disk usage for a given partition (or all partitions)')
-    parser.add_argument('partition', nargs='?', default=None, 
+    ###########################################
+    # argument parsing
+    parser = argparse.ArgumentParser(description='Get disk usage for a given partition (or all partitions). Can send emails if disk space goes below a given threshold.')
+    parser.add_argument('partition', nargs='?', 
                         help='Partition to check space on. All partitions will be checked if this option is not used.')
-    parser.add_argument('-s', '--size', nargs=1, choices=sizes, default=None,
+    parser.add_argument('-s', '--size', nargs=1, choices=sizes, 
                         help='Disk usage should be reported in this increment.')
-    parser.add_argument('-t', '--threshold-free', nargs=1, type=float, default=None,
-                        help='Threshold to send emails at (eg. 20G free space left).')
-    parser.add_argument('-p', '--percent-free', nargs=1, type=float, default=None,
-                        help='Percentage threshold to send emails at (eg. 10 percent of total space left).')
+    parser.add_argument('-t', '--threshold-free', nargs=1, type=str,
+                        help='Threshold of free disk space to send emails at (eg. 20G free space left).')
+    parser.add_argument('-p', '--percent-free', nargs=1, type=float, 
+                        help='Percentage free threshold to send emails at (eg. 10 percent of total space left).')
+    parser.add_argument('-m', '--email', nargs=1, type=str,
+                        help='Address to send email to if thresholds are passed.')
     argv = parser.parse_args()
 
+    # make sure partitions are valid
     partitions = argv.partition
     all_partitions = [diskpart.mountpoint for diskpart in psutil.disk_partitions()]
     if partitions is None:
@@ -27,15 +32,29 @@ def main():
     elif partitions not in all_partitions:
         sys.exit('Partition "' + partitions + '" not a valid partition. Must be one of: "' + '", "'.join(all_partitions) + '"')
     
+    # make sure size increments are valid if they exist
+    increment = argv.size
+    if increment is not None:
+        increment = increment[0].upper()
+
+    # make sure an email has been provided if diskfree has been setup to email at a threshold
+    if (argv.percent_free is not None or argv.threshold_free is not None) and argv.email is None:
+        sys.exit('Error: Email address must be set if using a threshold option.')
+
+    #######################################
+    # get partition stats
     partstats = []
     for partition in partitions:
         partstats.append(psutil.disk_usage(partition))
     partstats = pd.DataFrame(partstats, index=partitions)
     partstats['percent'] = 100. - partstats['percent']
-    partstats[['total', 'used', 'free']] = partstats[['total', 'used', 'free']].applymap(lambda cell: humanize(cell, argv.size[0]))
+    partstats[['total', 'used', 'free']] = partstats[['total', 'used', 'free']].applymap(lambda cell: humanize(cell, increment))
 
-    # print output
-    print(partstats)
+    if argv.email is not None:
+        # send an email with full disk usages and highlight which partitions failed the check
+    else:
+        # just print output
+        print(partstats)
 
 
 def humanize(num_bytes, size=None):
