@@ -65,9 +65,9 @@ def main():
         if len(failed) > 0:
             # send an email with full disk usages and highlight which partitions failed the check
             hostname = socket.gethostname()
-            message = '\n'.join(['Partitions ' + ', '.join(failed) + ' on ' + hostname + ' has passed a disk usage threshold.', '',
-                                 'All disks:', '', str(get_partition_free(all_partitions))])
-            email = MIMEText(message)
+
+            email = MIMEText('<p>Partition ' + ', '.join(failed) + ' on ' + hostname + ' has passed a disk usage threshold.</p>' + \
+                             '<p>All disks:</p>' + get_partition_free(all_partitions).to_html(), 'html')
             email['Subject'] = 'Disk threshold passed on ' + hostname
             email['From'] = 'noreply@localhost.' + socket.getfqdn()
             
