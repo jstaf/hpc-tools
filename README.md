@@ -1,23 +1,23 @@
 hpc-tools
 ==============================================
 
-A set of scripts to make HPC admin life a bit easier.
+A set of scripts to make HPC admin life a bit easier. 
+Refer to each script's help documentation for usage instructions (`commandname -h`).
+All scripts are cross-platform (Windows + UNIX) unless indicated.
 
--------------------------------------------
-`sandbox` - Cap a command at a certain number of processors using CPU affinities.
-
-Usage: `sandbox [-n procs, -d, -h] -c someCommand`
-
-+ `-c` - A bash command to be run.
-+ `-n` - Cap command at <procs> number of processors. Default is 1 processor.
-+ `-d` - Add a random time delay before running a job (use this if you expect to run multiple sandbox processes on the 
-         same machine that will begin running more or less all at the exact same time).
-
--------------------------------------------
+`diskfree` - A python equivalent of `df -h` meant to be run under Cron or Windows Task Scheduler. Emails you if disk usage passes a certain threshold. 
+`sandbox` - Cap a command at a certain number of processors using CPU affinities (UNIX only).
 `sge2slurm` - Converts old Sun Grid Engine (SGE) job scripts to their SLURM equivalents.
 
-Usage: `sge2slurm input_sge [output_slurm]`
+## Dependencies
 
-+ `input_sge` - A SGE job script to be converted.
-+ `output_slurm` - Filename of output SLURM script. Defaults to "`input_sge`-slurm.sh" if not set.
+These scripts have very few dependencies aside from the core Python libraries, 
+but you can install them with these commands 
+(aimed at RHEL-flavored distributions, but should also be pretty easy to install on Debian/Ubuntu).
+You can also just install Anaconda and be done with it.
 
+```
+yum install epel-release
+yum install python34 python34-devel python34-pip python34-paramiko
+pip3 install psutil pandas
+```
