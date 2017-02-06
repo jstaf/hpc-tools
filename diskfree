@@ -25,6 +25,8 @@ def main():
                         help='Percentage free threshold to send emails at (eg. 10 percent of total space left).')
     parser.add_argument('-m', '--email', nargs=1, type=str,
                         help='Address to send email to if thresholds are passed.')
+    parser.add_argument('-H', '--host', nargs=1, type=str,
+                        help='Server and port to email to, follows the format host:port')
     argv = parser.parse_args()
 
     # make sure partitions are valid
@@ -65,10 +67,15 @@ def main():
                                  'All disks:', str(get_partition_free(all_partitions))])
             email = MIMEText(message)
             email['Subject'] = 'Disk threshold passed on ' + hostname
-            email['From'] = 'noreply@' + socket.getfqdn()
+            email['From'] = 'noreply@localhost.' + socket.getfqdn()
             email['To'] = argv.email[0]
 
-            server = smtplib.SMTP(host='localhost', port=25)
+            if argv.host is None:
+                server = smtplib.SMTP(host='localhost', port=25)
+            else:
+                addr = argv.host[0].split(sep=':')[0]
+                port = int(argv.host[0].split(sep=':')[1])
+                server = smtplib.SMTP(host=addr, port=port)
             server.send_message(email)
             server.quit()
 
