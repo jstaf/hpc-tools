@@ -33,7 +33,7 @@ def main():
 
     # make sure partitions are valid
     partitions = argv.partition
-    all_partitions = [diskpart.mountpoint for diskpart in psutil.disk_partitions()]
+    all_partitions = [diskpart.mountpoint for diskpart in psutil.disk_partitions(all=True) if '/' in diskpart.device]
     if partitions is None:
         partitions = all_partitions
     elif partitions not in all_partitions:
