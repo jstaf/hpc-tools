@@ -26,9 +26,9 @@ def main():
     parser.add_argument('-m', '--email', nargs=1, type=str,
                         help='Comma-delimited list of addresses to send email to if thresholds are passed.')
     parser.add_argument('-H', '--host', nargs=1, type=str, default='localhost',
-                        help='Server mailserver to send messages through')
+                        help='Server mailserver to send messages through. Defaults to localhost.')
     parser.add_argument('-P', '--port', nargs=1, type=int, default=25,
-                        help='Mailserver SMTP port')
+                        help='Mailserver SMTP port. Defaults to 25.')
     argv = parser.parse_args()
 
     # make sure partitions are valid
