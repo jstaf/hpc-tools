@@ -20,6 +20,6 @@ You can also just install Anaconda and be done with it.
 
 ```
 yum install epel-release
-yum install python34 python34-devel python34-pip python34-paramiko
+yum install gcc python34 python34-devel python34-pip python34-paramiko
 pip3 install psutil pandas
 ```
