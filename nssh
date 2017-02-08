@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+
+# This is a parallel wrapper around SSH to be used on a cluster.
+# Wait, isn't this just a copy of pssh? Yes, yes it is. 
+# Written to be slightly easier to use, and also works on a Solaris box I have lurking about.
+
+import argparse
+import os
+import getpass
+import asyncio
+import subprocess
+
+def main(): 
+    parser = argparse.ArgumentParser(description='Run an SSH command in parallel across a set of nodes')
+    parser.add_argument('nodes', nargs=1, type=str,
+                        help='A comma-seperated list of nodes or path to a file with a nodelist (one line per node).')
+    parser.add_argument('command', nargs='+', type=str, 
+                        help='Command to be run')
+    parser.add_argument('-u', '--user', nargs=1, type=str, default=getpass.getuser(), 
+                        help='User to connect as. Defaults to current user.')
+    parser.add_argument('-p', '--port', nargs=1, type=int, default=22,
+                        help='Port to connect over')
+    parser.add_argument('-o', '--option', nargs=1, 
+                        help='Options to be passed to SSH')
+    argv = parser.parse_args()
+
+    # get all nodes to ssh to
+    nodes_arg = argv.nodes[0]
+    if os.path.exists(nodes_arg):
+        # we were given a nodelist file
+        nodes = []
+        with open(nodes_arg) as nodelist:
+            for line in nodelist:
+                nodes.append(line.strip())
+    else:
+        # we were given a comma-separated list of nodes
+        nodes = nodes_arg.split(',')
+
+    print(argv.command)
+
+    # create async tasks and run them
+    loop = asyncio.get_event_loop()
+    ssh_tasks = [run_ssh(' '.join(argv.command), node, user=argv.user[0]) for node in nodes]
+    loop.run_until_complete(ssh_tasks)
+    loop.close()
+
+
+@asyncio.coroutine
+def run_ssh(command, host, user=getpass.getuser(), port=22):
+    ssh = subprocess.Popen(
+        ' '.join(['ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p', port, user + '@' + host, command]),
+        shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    yield from (ssh.stdout.read(), ssh.stderr.read())
+    
+
+if __name__ == '__main__':
+    main()
