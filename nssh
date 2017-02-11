@@ -8,7 +8,7 @@ import argparse
 import os
 import getpass
 import asyncio
-import subprocess
+from asyncio.subprocess import PIPE
 
 def main(): 
     parser = argparse.ArgumentParser(description='Run an SSH command in parallel across a set of nodes')
@@ -36,21 +36,26 @@ def main():
         # we were given a comma-separated list of nodes
         nodes = nodes_arg.split(',')
 
-    print(argv.command)
-
     # create async tasks and run them
     loop = asyncio.get_event_loop()
-    ssh_tasks = [run_ssh(' '.join(argv.command), node, user=argv.user[0]) for node in nodes]
-    loop.run_until_complete(ssh_tasks)
+    #ssh_tasks = [run_ssh(' '.join(argv.command), node, user=argv.user[0]) for node in nodes]
+
+    ssh_tasks = [tester(node) for node in nodes]
+    loop.run_until_complete(asyncio.wait(ssh_tasks))
     loop.close()
 
-
 @asyncio.coroutine
-def run_ssh(command, host, user=getpass.getuser(), port=22):
-    ssh = subprocess.Popen(
-        ' '.join(['ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -p', port, user + '@' + host, command]),
-        shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    yield from (ssh.stdout.read(), ssh.stderr.read())
+def tester(command):
+    print('started task {}'.format(command))
+    #yield from asyncio.sleep(2)
+    process = yield from asyncio.create_subprocess_shell('sleep 2', stdout=PIPE, stderr=PIPE)
+    yield from process.wait()  # wait for process to finish
+    print('finished task {}, with exit code {}'.format(command, process.returncode))
+    
+    # yield from asyncio.create_subprocess_shell('sleep 2', 
+    #     shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+    
     
 
 if __name__ == '__main__':
