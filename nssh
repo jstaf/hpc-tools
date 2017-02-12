@@ -102,7 +102,7 @@ def ssh(host, command, user=getpass.getuser(), quiet=False):
     code = process.returncode
     if code == 0:
         print(TColors.fmt(host + '...', TColors.BOLD), TColors.fmt('[SUCCESS]', [TColors.BOLD, TColors.GREEN]), file=sys.stderr)
-    elif code == 255: 
+    elif 'timed out' in stderr.decode('utf-8').lower(): 
         print(TColors.fmt(host + '...', TColors.BOLD), TColors.fmt('[TIMEOUT]', [TColors.BOLD, TColors.YELLOW]), file=sys.stderr)
     else:
         print(TColors.fmt(host + '...', TColors.BOLD), TColors.fmt('[FAILURE]', [TColors.BOLD, TColors.RED]), file=sys.stderr)
