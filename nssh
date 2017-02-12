@@ -50,6 +50,8 @@ def main():
                         help='Command to be run')
     parser.add_argument('-u', '--user', nargs=1, type=str, default=getpass.getuser(), 
                         help='User to connect as. Defaults to current user.')
+    parser.add_argument('-q', '--quiet', default=False, const=True, action='store_const', 
+                        help="Don't print messages from stdout on target machines.")
     parser.add_argument('-o', '--option', nargs=1, 
                         help='Options to be passed to SSH')
     argv = parser.parse_args()
@@ -68,16 +70,26 @@ def main():
 
     # create async tasks and run them
     loop = asyncio.get_event_loop()
-    tasks = [asyncio.async(ssh(node, ' '.join(argv.command))) for node in nodes]
-    completed, failed = loop.run_until_complete(asyncio.wait(tasks))
+    tasks = [asyncio.async(
+        ssh(node, ' '.join(argv.command), user=argv.user, quiet=argv.quiet)
+        ) for node in nodes]
+    finished, unfinished = loop.run_until_complete(asyncio.wait(tasks))
     loop.close()
 
-    codes = [process.result() for process in completed]
-    print(TColors.fmt('{} of {} tasks completed successfully!'.format(codes.count(0), len(tasks)), TColors.BOLD))
+    # print number of completed tasks
+    codes = [process.result()[1] for process in finished]
+    print(TColors.fmt('{} of {} tasks completed successfully!'.format(codes.count(0), len(tasks)), TColors.BOLD), 
+        file=sys.stderr)
+    
+    # identify failing nodes
+    failures = set(filter(lambda process: process.result()[1] != 0, finished))
+    failures = {failure.result()[0] for failure in failures}
+    if len(failures) != 0:
+        print(TColors.fmt('\nFailed nodes: ' + ','.join(failures), TColors.BOLD), file=sys.stderr)
 
 
 @asyncio.coroutine
-def ssh(host, command, user=getpass.getuser()):
+def ssh(host, command, user=getpass.getuser(), quiet=False):
     """
     This runs wraps and runs the SSH command for each node
     """
@@ -90,18 +102,18 @@ def ssh(host, command, user=getpass.getuser()):
     # write pretty status message
     code = process.returncode
     if code == 0:
-        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[SUCCESS]', [TColors.BOLD, TColors.GREEN]), file=sys.stdout)
+        print(TColors.fmt(host + '...', TColors.BOLD), TColors.fmt('[SUCCESS]', [TColors.BOLD, TColors.GREEN]), file=sys.stderr)
     elif code == 255: 
-        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[TIMEOUT]', [TColors.BOLD, TColors.YELLOW]), file=sys.stdout)
+        print(TColors.fmt(host + '...', TColors.BOLD), TColors.fmt('[TIMEOUT]', [TColors.BOLD, TColors.YELLOW]), file=sys.stderr)
     else:
-        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[FAILURE]', [TColors.BOLD, TColors.RED]), file=sys.stdout)
+        print(TColors.fmt(host + '...', TColors.BOLD), TColors.fmt('[FAILURE]', [TColors.BOLD, TColors.RED]), file=sys.stderr)
 
-
-    print(stderr.decode('utf-8'), file=sys.stderr)
-    print(stdout.decode('utf-8'))
+    if not quiet:
+        print(stdout.decode('utf-8'), end='')
+    print(stderr.decode('utf-8'), end='', file=sys.stderr)
 
     #print('HOST {} - finished with exit code {}'.format(host, process.returncode))  # debug
-    return code
+    return host, code
     
 
 if __name__ == '__main__':
