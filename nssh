@@ -9,6 +9,7 @@ import os
 import getpass
 import asyncio
 from asyncio.subprocess import PIPE
+import sys
 
 class TColors:
     """
@@ -71,17 +72,8 @@ def main():
     completed, failed = loop.run_until_complete(asyncio.wait(tasks))
     loop.close()
 
-    codes = [process.result().returncode for process in completed]
+    codes = [process.result() for process in completed]
     print(TColors.fmt('{} of {} tasks completed successfully!'.format(codes.count(0), len(tasks)), TColors.BOLD))
-
-
-def pprint(host, code, message):
-    if code == 0:
-        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[SUCCESS]', [TColors.BOLD, TColors.GREEN]), '-', message)
-    elif code == 255: 
-        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[TIMEOUT]', [TColors.BOLD, TColors.YELLOW]), '-', message)
-    else:
-        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[FAILURE]', [TColors.BOLD, TColors.RED]), '-', message)
 
 
 @asyncio.coroutine
@@ -94,10 +86,22 @@ def ssh(host, command, user=getpass.getuser()):
 
     process = yield from asyncio.create_subprocess_shell(command, stdout=PIPE, stderr=PIPE)
     stdout, stderr = yield from process.communicate()  # wait for process to finish
-    pprint(host, process.returncode, stdout.decode('utf-8'))
-    
+
+    # write pretty status message
+    code = process.returncode
+    if code == 0:
+        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[SUCCESS]', [TColors.BOLD, TColors.GREEN]), file=sys.stdout)
+    elif code == 255: 
+        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[TIMEOUT]', [TColors.BOLD, TColors.YELLOW]), file=sys.stdout)
+    else:
+        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[FAILURE]', [TColors.BOLD, TColors.RED]), file=sys.stdout)
+
+
+    print(stderr.decode('utf-8'), file=sys.stderr)
+    print(stdout.decode('utf-8'))
+
     #print('HOST {} - finished with exit code {}'.format(host, process.returncode))  # debug
-    return process
+    return code
     
 
 if __name__ == '__main__':
