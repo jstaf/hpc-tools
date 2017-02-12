@@ -24,6 +24,12 @@ class TColors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
+    def fmt(text, style):
+        style = ''.join(style)
+        return style + text + TColors.END
+
+
     def demo():
         print(TColors.PURPLE + 'purple')
         print(TColors.BLUE + 'blue')
@@ -43,8 +49,6 @@ def main():
                         help='Command to be run')
     parser.add_argument('-u', '--user', nargs=1, type=str, default=getpass.getuser(), 
                         help='User to connect as. Defaults to current user.')
-    parser.add_argument('-p', '--port', nargs=1, type=int, default=22,
-                        help='Port to connect over')
     parser.add_argument('-o', '--option', nargs=1, 
                         help='Options to be passed to SSH')
     argv = parser.parse_args()
@@ -64,32 +68,35 @@ def main():
     # create async tasks and run them
     loop = asyncio.get_event_loop()
     tasks = [asyncio.async(ssh(node, ' '.join(argv.command))) for node in nodes]
-    futures, empty = loop.run_until_complete(asyncio.wait(tasks))
+    completed, failed = loop.run_until_complete(asyncio.wait(tasks))
     loop.close()
 
-    print(futures)
-    print(tasks)
+    codes = [process.result().returncode for process in completed]
+    print(TColors.fmt('{} of {} tasks completed successfully!'.format(codes.count(0), len(tasks)), TColors.BOLD))
 
-    # for future in tasks:
-    #     print(type(future.result()))
-    #     print(future.result())
 
-    # print(asyncio.gather(tasks))
+def pprint(host, code, message):
+    if code == 0:
+        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[SUCCESS]', [TColors.BOLD, TColors.GREEN]), '-', message)
+    elif code == 255: 
+        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[TIMEOUT]', [TColors.BOLD, TColors.YELLOW]), '-', message)
+    else:
+        print(TColors.fmt(host, TColors.BOLD), TColors.fmt('[FAILURE]', [TColors.BOLD, TColors.RED]), '-', message)
 
 
 @asyncio.coroutine
-def ssh(host, command):
+def ssh(host, command, user=getpass.getuser()):
     """
     This runs wraps and runs the SSH command for each node
     """
 
-    print('HOST {} - starting task {}'.format(host, command))  # debug
-    
+    #print('HOST {} - starting task {}'.format(host, command))  # debug
+
     process = yield from asyncio.create_subprocess_shell(command, stdout=PIPE, stderr=PIPE)
-    yield from process.wait()  # wait for process to finish
+    stdout, stderr = yield from process.communicate()  # wait for process to finish
+    pprint(host, process.returncode, stdout.decode('utf-8'))
     
-    print('HOST {} - finished with exit code {}'.format(host, process.returncode))  # debug
-    #return process.stdout.read()
+    #print('HOST {} - finished with exit code {}'.format(host, process.returncode))  # debug
     return process
     
 
