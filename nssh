@@ -83,7 +83,7 @@ def main():
     
     # identify failing nodes
     failures = set(filter(lambda process: process.result()[1] != 0, finished))
-    failures = {failure.result()[0] for failure in failures}
+    failures = [failure.result()[0] for failure in failures].sort()
     if len(failures) != 0:
         print(TColors.fmt('\nFailed nodes: ' + ','.join(failures), TColors.BOLD), file=sys.stderr)
 
