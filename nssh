@@ -94,7 +94,7 @@ def ssh(host, command, user=getpass.getuser(), quiet=False):
     This runs wraps and runs the SSH command for each node
     """
 
-    command = ' '.join(['ssh -x -o ConnectTimeout=10 -o StrictHostKeyChecking=no', user + '@' + host, command])
+    command = ' '.join(['ssh -x -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null', user + '@' + host, command])
     process = yield from asyncio.create_subprocess_shell(command, stdout=PIPE, stderr=PIPE)
     stdout, stderr = yield from process.communicate()  # wait for process to finish
 
