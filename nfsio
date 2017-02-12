@@ -22,12 +22,12 @@ def main():
         all_stats.append(mount)
 
     # write to csv
-    with open(sys.stdout) as out:
-        csvwrite = csv.writer(out)
-        if not argv.no_header:
-            csvwrite.writerow(['node', 'device', 'user', 
-                'rOps_s', 'rkB_s', 'rkB_op', 'rretrans', 'rblank', 'ravgRTT_ms', 'ravgexe_ms',
-                'wOps_s', 'wkB_s', 'wkB_op', 'wretrans', 'wblank', 'wavgRTT_ms', 'wavgexe_ms'])
+    csvwrite = csv.writer(sys.stdout)
+    if not argv.no_header:
+        csvwrite.writerow(['node', 'device', 'user', 
+            'rOps_s', 'rkB_s', 'rkB_op', 'rretrans', 'rblank', 'ravgRTT_ms', 'ravgexe_ms',
+            'wOps_s', 'wkB_s', 'wkB_op', 'wretrans', 'wblank', 'wavgRTT_ms', 'wavgexe_ms'])
+    if not argv.header_only:
         csvwrite.writerows(all_stats)
 
 
@@ -35,8 +35,9 @@ def get_node_nfs():
     """
     Get and parse a node's NFS traffic.
     """
-    ssh = subprocess.Popen('nfsiostat', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    nfsiostat = ssh.stdout.read().split('\n')
+    proc = subprocess.Popen('nfsiostat', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    nfsiostat, stderr = proc.communicate()
+    nfsiostat = nfsiostat.decode('utf-8').split('\n')
 
     # list of dictionaries with nfs stats
     entries = []
