@@ -10,6 +10,31 @@ import getpass
 import asyncio
 from asyncio.subprocess import PIPE
 
+class TColors:
+    """
+    A bunch of escape sequences for terminal formatting.
+    """
+
+    PURPLE = '\033[95m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    END = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+    def demo():
+        print(TColors.PURPLE + 'purple')
+        print(TColors.BLUE + 'blue')
+        print(TColors.GREEN + 'green')
+        print(TColors.YELLOW + 'yellow')
+        print(TColors.RED + 'red' + TColors.END)
+        print(TColors.BOLD + 'bold')
+        print(TColors.UNDERLINE + 'underline')
+        print(TColors.END + 'end')
+
+
 def main(): 
     parser = argparse.ArgumentParser(description='Run an SSH command in parallel across a set of nodes')
     parser.add_argument('nodes', nargs=1, type=str,
@@ -38,24 +63,34 @@ def main():
 
     # create async tasks and run them
     loop = asyncio.get_event_loop()
-    #ssh_tasks = [run_ssh(' '.join(argv.command), node, user=argv.user[0]) for node in nodes]
-
-    ssh_tasks = [tester(node) for node in nodes]
-    loop.run_until_complete(asyncio.wait(ssh_tasks))
+    tasks = [asyncio.async(ssh(node, ' '.join(argv.command))) for node in nodes]
+    futures, empty = loop.run_until_complete(asyncio.wait(tasks))
     loop.close()
 
+    print(futures)
+    print(tasks)
+
+    # for future in tasks:
+    #     print(type(future.result()))
+    #     print(future.result())
+
+    # print(asyncio.gather(tasks))
+
+
 @asyncio.coroutine
-def tester(command):
-    print('started task {}'.format(command))
-    #yield from asyncio.sleep(2)
-    process = yield from asyncio.create_subprocess_shell('sleep 2', stdout=PIPE, stderr=PIPE)
+def ssh(host, command):
+    """
+    This runs wraps and runs the SSH command for each node
+    """
+
+    print('HOST {} - starting task {}'.format(host, command))  # debug
+    
+    process = yield from asyncio.create_subprocess_shell(command, stdout=PIPE, stderr=PIPE)
     yield from process.wait()  # wait for process to finish
-    print('finished task {}, with exit code {}'.format(command, process.returncode))
     
-    # yield from asyncio.create_subprocess_shell('sleep 2', 
-    #     shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    
-    
+    print('HOST {} - finished with exit code {}'.format(host, process.returncode))  # debug
+    #return process.stdout.read()
+    return process
     
 
 if __name__ == '__main__':
