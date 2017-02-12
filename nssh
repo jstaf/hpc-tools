@@ -71,7 +71,7 @@ def main():
     # create async tasks and run them
     loop = asyncio.get_event_loop()
     tasks = [asyncio.async(
-        ssh(node, ' '.join(argv.command), user=argv.user[0], quiet=argv.quiet)
+        ssh(node, ' '.join(argv.command), user=''.join(argv.user), quiet=argv.quiet)
         ) for node in nodes]
     finished, unfinished = loop.run_until_complete(asyncio.wait(tasks))
     loop.close()
