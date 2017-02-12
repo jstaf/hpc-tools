@@ -70,11 +70,12 @@ def main():
 
     # create async tasks and run them
     loop = asyncio.get_event_loop()
-    tasks = [asyncio.async(
-        ssh(node, ' '.join(argv.command), user=''.join(argv.user), quiet=argv.quiet)
-        ) for node in nodes]
-    finished, unfinished = loop.run_until_complete(asyncio.wait(tasks))
-    loop.close()
+    tasks = [ssh(node, ' '.join(argv.command), user=''.join(argv.user), quiet=argv.quiet) for node in nodes]
+    try:
+        finished, unfinished = loop.run_until_complete(asyncio.wait(tasks))
+        loop.close()
+    except KeyboardInterrupt:
+        sys.exit('Pending tasks cancelled by user.')
 
     # print number of completed tasks
     codes = [process.result()[1] for process in finished]
@@ -83,7 +84,8 @@ def main():
     
     # identify failing nodes
     failures = set(filter(lambda process: process.result()[1] != 0, finished))
-    failures = [failure.result()[0] for failure in failures].sort()
+    failures = [failure.result()[0] for failure in failures]
+    failures.sort()
     if len(failures) != 0:
         print(TColors.fmt('\nFailed nodes: ' + ','.join(failures), TColors.BOLD), file=sys.stderr)
 
