@@ -1,0 +1,36 @@
+#!/bin/bash
+# Sets up and starts a Jupyter Notebook server with password protection and SSL.
+
+# detect proper jupyter notebook start command
+if [ $(jupyter --version | grep -oe '^[0-9]') -ge 4 ]; then
+	NBCOMMAND=jupyter
+else
+	NBCOMMAND=ipython
+fi
+CERTFILE=~/.$NBCOMMAND/nbcert.pem
+
+if [ ! -f $CERTFILE ]; then
+	echo 'Creating server profile...'
+	if [ $NBCOMMAND == "ipython" ]; then
+		ipython profile create server 2> /dev/null
+		XOPTS='--profile=server'
+	else
+		jupyter notebook --generate-config
+	fi
+
+	echo 'Enter a password for your notebooks...'
+	HASH=$(ipython -c 'from IPython.lib import passwd; print(passwd())')
+	if [ $NBCOMMAND == "ipython" ]; then
+		echo "c.NotebookApp.password = u'$HASH'" >> ~/.ipython/profile_server/ipython_notebook_config.py
+	else
+		echo "c.NotebookApp.password = u'$HASH'" >> ~/.jupyter/jupyter_notebook_config.py
+	fi
+
+	# create a self-signed SSL certificate to avoid passing passwords in plaintext
+	openssl req -x509 -nodes -days 3650 -newkey rsa:1024 -keyout $CERTFILE -out $CERTFILE \
+		-subj "/C=CA/ST=ON/CN=$(whoami)" 2> /dev/null
+fi
+
+echo 'NOTE: You must connect via HTTPS (e.g. https://localhost:port). Because this server is running under a self-signed SSL certificate (for added security), you must manually accept this certificate in your browser before you can log on.'
+$NBCOMMAND notebook --no-browser --ip=$(hostname) --certfile=$CERTFILE $XOPTS
+
